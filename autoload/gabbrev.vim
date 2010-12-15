@@ -1,11 +1,16 @@
-" inoremap <silent> <expr> <C-]> gabbrev#i_start()
-" setlocal completefunc=gabbrev#complete
+if !exists('g:gabbrev#abbrev_ch_pattern')
+    let g:gabbrev#abbrev_ch_pattern = '[[:alnum:]]'
+endif
+
+if !exists('g:gabbrev#keyword_ch_pattern')
+    let g:gabbrev#keyword_ch_pattern = '\k'
+endif
 
 function! gabbrev#setup()
     let col = col('.')
     let line = line('.')
     let mode = col == len(getline('.')) ? 'a' : 'i'
-    let pat = '\i*\%' . (col + (mode == 'a' ? 1 : 0)) . 'c'
+    let pat = g:gabbrev#abbrev_ch_pattern . '*\%' . (col + (mode == 'a' ? 1 : 0)) . 'c'
     let word = matchstr(getline('.'), pat)
 
     return [ col, line, mode, pat, word ]
@@ -14,7 +19,7 @@ endfunction
 function! gabbrev#expand(default)
     let [ col, line, mode, pat, word ] = gabbrev#setup()
 
-    if (!len(word))
+    if !len(word)
         return
     endif
 
@@ -33,14 +38,13 @@ endfunction
 function! gabbrev#complete(findstart, base)
     let [ col, line, mode, pat, word ] = gabbrev#setup()
 
-    if (a:findstart)
+    if a:findstart
         return len(word) > 0 ? col('.') - len(word) - 1 : -1
     endif
 
     return gabbrev#gabbrev(a:base, { 'all': 1, 'completefunc': 1 })
 endfunction
 
-" TODO customize regex
 function! gabbrev#gabbrev(word, ...)
     let option = a:0 ? a:1 : {}
 
@@ -50,8 +54,9 @@ function! gabbrev#gabbrev(word, ...)
         endif
     endfor
 
-    " eg. 'AbCD' -> \<Ab\i*\(\i\@!\k\)\+C\i*\(\i\@!\k\)\+D\i*
-    let pat = '\<' . join(map(split(a:word, '\u\U*\zs'), "v:val . '\\i*'"), '\(\i\@!\k\)\+')
+    " eg. 'AbCD' -> '\<Ab\%([[:alnum:]]\)*\%(\%([[:alnum:]]\)\@!\%(\k\)\)\+C\%([[:alnum:]]\)*\%(\%([[:alnum:]]\)\@!\%(\k\)\)\+D\%([[:alnum:]]*\)'
+    " let pat = '\<' . join(map(split(a:word, '\u\U*\zs'), "v:val . '\\i*'"), '\(\i\@!\k\)\+')
+    let pat = '\<' . join(map(split(a:word, '\u\U*\zs'), 'v:val . ''\%(' . g:gabbrev#abbrev_ch_pattern . '\)*'''), '\%(\%(' . g:gabbrev#abbrev_ch_pattern . '\)\@!\%(' . g:gabbrev#keyword_ch_pattern . '\)\)\+')
 
     let cands = {}
 
