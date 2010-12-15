@@ -30,7 +30,6 @@ function! gabbrev#expand(default)
     call cursor('.', col - len(word) + len(expanded))
 endfunction
 
-" TODO use complete_add()
 function! gabbrev#complete(findstart, base)
     let [ col, line, mode, pat, word ] = gabbrev#setup()
 
@@ -65,11 +64,19 @@ function! gabbrev#gabbrev(word, ...)
         if getbufvar(i, '&filetype') != &filetype | continue | endif
         let lines = getbufline(i, 1, '$')
         for j in range(0, len(lines) - 1)
-            if i == bufnr('%') && j == line('.') | continue | endif
-            let line = lines[j]
-            let m = matchstr(line, pat)
+            if i == bufnr('%') && j == line('.')
+                continue
+            endif
+
+            let m = matchstr(lines[j], pat)
             if !len(m) | continue | endif
-            if option.all
+
+            if option.completefunc
+                call complete_add(m)
+                if complete_check()
+                    return
+                endif
+            elseif option.all
                 let cands[m] = get(cands, m, 0) + 1
             else
                 return m
@@ -93,12 +100,12 @@ endfunction
 function! gabbrev#i_start()
     let [ col, line, mode, pat, word ] = gabbrev#setup()
 
+    if pumvisible()
+        return "\<C-N>"
+    endif
+
     if exists('b:gabbrev_last_expand') && len(b:gabbrev_last_expand)
                 \ && [ line, col - len(b:gabbrev_last_expand) ] == b:gabbrev_complete_pos
-        if pumvisible()
-            return "\<C-N>"
-        endif
-
         if &completefunc == 'gabbrev#complete'
             return repeat("\<BS>", len(b:gabbrev_last_expand)) . b:gabbrev_last_abbrev . "\<C-X>\<C-U>"
         else
