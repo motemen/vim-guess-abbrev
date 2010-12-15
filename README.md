@@ -15,6 +15,6 @@ SETTING UP
 Write in your ftplugin/perl.vim
 
 	inoremap <silent> <expr> <C-]> gabbrev#start()
-	setlocal omnifunc=gabbrev#complete
+	setlocal completefunc=gabbrev#complete
 
 Typing uppercase letters and hitting `<C-]>` in insertmode will suggest first match. Next type will start full popup completion.

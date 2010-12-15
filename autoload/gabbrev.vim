@@ -1,5 +1,5 @@
-" inoremap <silent> <expr> <C-]> gabbrev#start()
-" setlocal omnifunc=gabbrev#complete
+" inoremap <silent> <expr> <C-]> gabbrev#i_start()
+" setlocal completefunc=gabbrev#complete
 
 function! gabbrev#setup()
     let col = col('.')
@@ -18,7 +18,7 @@ function! gabbrev#expand(default)
         return
     endif
 
-    let expanded = gabbrev#gabbrev(word, 0)
+    let expanded = gabbrev#gabbrev(word)
     if !len(expanded)
         let expanded = word . a:default
         let b:gabbrev_last_expand = ''
@@ -38,22 +38,27 @@ function! gabbrev#complete(findstart, base)
         return len(word) > 0 ? col('.') - len(word) - 1 : -1
     endif
 
-    return gabbrev#gabbrev(a:base, 1)
+    return gabbrev#gabbrev(a:base, { 'all': 1, 'completefunc': 1 })
 endfunction
 
 " TODO customize regex
-function! gabbrev#gabbrev(word, all)
+function! gabbrev#gabbrev(word, ...)
+    let option = a:0 ? a:1 : {}
+
+    for p in [ 'all', 'completefunc' ]
+        if !exists('option.' . p)
+            let option[p] = 0
+        endif
+    endfor
+
     " eg. 'AbCD' -> \<Ab\i*\(\i\@!\k\)\+C\i*\(\i\@!\k\)\+D\i*
     let pat = '\<' . join(map(split(a:word, '\u\U*\zs'), "v:val . '\\i*'"), '\(\i\@!\k\)\+')
 
     let cands = {}
 
     let bufnrs = range(0, bufnr('$'))
-
-    if !a:all
-        call remove(bufnrs, bufnr('%'))
-        call insert(bufnrs, bufnr('%'))
-    endif
+    call remove(bufnrs, bufnr('%'))
+    call insert(bufnrs, bufnr('%'))
 
     for i in bufnrs
         if !bufexists(i) | continue | endif
@@ -64,7 +69,7 @@ function! gabbrev#gabbrev(word, all)
             let line = lines[j]
             let m = matchstr(line, pat)
             if !len(m) | continue | endif
-            if a:all
+            if option.all
                 let cands[m] = get(cands, m, 0) + 1
             else
                 return m
@@ -72,7 +77,7 @@ function! gabbrev#gabbrev(word, all)
         endfor
     endfor
 
-    if !a:all
+    if !option.all
         return ''
     end
 
@@ -85,11 +90,20 @@ function! gabbrev#gabbrev(word, all)
     return sort(keys, function('s:cmp'))
 endfunction
 
-function! gabbrev#start()
+function! gabbrev#i_start()
     let [ col, line, mode, pat, word ] = gabbrev#setup()
 
-    if exists('b:gabbrev_last_expand') && len(b:gabbrev_last_expand) && [ line, col - len(b:gabbrev_last_expand) ] == b:gabbrev_complete_pos
-        return repeat("\<BS>", len(b:gabbrev_last_expand)) . b:gabbrev_last_abbrev . "\<C-X>\<C-U>"
+    if exists('b:gabbrev_last_expand') && len(b:gabbrev_last_expand)
+                \ && [ line, col - len(b:gabbrev_last_expand) ] == b:gabbrev_complete_pos
+        if pumvisible()
+            return "\<C-N>"
+        endif
+
+        if &completefunc == 'gabbrev#complete'
+            return repeat("\<BS>", len(b:gabbrev_last_expand)) . b:gabbrev_last_abbrev . "\<C-X>\<C-U>"
+        else
+            return "\<C-R>=[complete(b:gabbrev_complete_pos[1], gabbrev#gabbrev(b:gabbrev_last_abbrev, { 'all': 1 })),''][1]\<CR>"
+        endif
     else
         let b:gabbrev_last_abbrev = word
         let b:gabbrev_complete_pos = [ line, col - len(word) ]
@@ -97,21 +111,13 @@ function! gabbrev#start()
     end
 endfunction
 
-" tools
-
-function! gabbrev#autocmd_once(group, def)
-    execute 'augroup' 'gabbrev#' . a:group
-        autocmd!
-        execute 'autocmd' join([ a:def, 'augroup gabbrev#' . a:group, "execute 'autocmd!'", 'augroup END'], ' | ')
-    augroup END
-endfunction
-
-function! gabbrev#autocmd_clear(group)
-    execute 'augroup' 'gabbrev#' . a:group
-        autocmd!
-    augroup END
-endfunction
-
 if exists('g:gabbrev_develop') && g:gabbrev_develop
-    call gabbrev#autocmd_once('develop', 'CursorHold * silent! delfunction gabbrev#start')
+    augroup gabbrev#develop
+        autocmd!
+        autocmd CursorHold *
+                    \ silent! delfunction gabbrev#i_start
+                    \ | augroup gabbrev#develop
+                    \ |     execute 'autocmd!'
+                    \ | augroup END
+    augroup END
 endif
