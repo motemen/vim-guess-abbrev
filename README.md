@@ -37,7 +37,7 @@ Pattern for characters which compose expanded word.
 HOW THIS WORKS
 --------------
 
-When called, gabbrev splits your input by uppercase (`/u`) characters.
+When called, gabbrev splits your input by uppercase (`/\u`) characters.
 
 	'FoBB' -> ['Fo', 'B', 'B']
 
